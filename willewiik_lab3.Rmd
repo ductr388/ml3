@@ -1,0 +1,288 @@
+---
+title: "Computer lab 2 block 1"
+author:
+- Simge Cinar
+- Duc Tran
+- William Wiik
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+geometry: top=100pt,bottom=100pt,left=68pt,right=66pt
+subtitle: 732A99
+header-includes:
+- \usepackage{booktabs}
+- \usepackage{float}
+- \usepackage{longtable}
+- \usepackage{caption}
+- \usepackage{fancyhdr}
+- \usepackage{titling}
+- \usepackage[swedish, english]{babel}
+- \renewcommand{\headrulewidth}{0pt}
+- \renewcommand{\and}{\\}
+- \pretitle{\centering\vspace{0cm}{\large Laboration report in Machine Learning
+  \par}\vspace{4cm}\Huge\textbf}
+- \posttitle{\vspace{1cm}\large\textbf{}\par}
+- \preauthor{\centering\vspace{4cm}\normalsize}
+- \postauthor{\par\vspace{3cm}}
+- \predate{\centering{\normalsize Division of Statistics and Machine Learning \\ Department
+  of Computer Science \\ Linköping University \par}}
+- \postdate{\par\vspace{2cm}}
+- \raggedbottom
+---
+
+<!-- <!-- Väljer språk till svenska för automatiska titlar -->
+<!-- \selectlanguage{swedish} -->
+
+<!-- Byter språket på figur- och tabellbeskrivningar till angivna namn -->
+\captionsetup[table]{name = Table}
+
+
+<!-- Anger sidnumreringens position -->
+\fancyhf{}
+\fancyfoot[C]{\thepage}
+\pagestyle{fancy}
+
+<!-- Tar bort sidnumrering för förteckningar och titelsidan -->
+\pagenumbering{gobble}
+
+<!-- Anger sidbrytning -->
+\clearpage
+
+<!-- Skapar en innehållsförteckning och anger djupet av rubrikerna som ska visas -->
+\setcounter{tocdepth}{3}
+\tableofcontents
+
+<!-- Anger sidbrytning -->
+\clearpage
+
+<!-- Börjar sidnumreringen på sida 1 efter att alla förteckningar visats -->
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+<!-- Börjar med kapitel 1 -->
+
+```{r options, echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(knitr)
+library(dplyr)
+library(neuralnet)
+library(cowplot)
+# knitr::opts_chunk$set(
+#   echo = TRUE, 
+#   fig.width = 4.5, 
+#   fig.height = 3)
+```
+
+
+# Assignment 3. Neural Networks
+
+
+## 3.1 
+
+Train a neural network to learn the trigonometric sine function. To do so, sample 500 points uniformly at random in the interval [0, 101010]. Apply the sine function to each point. The resulting value pairs are the data points available to you. Use 25 of the 500 points for training and the rest for test. Use one hidden layer with 10 hidden units. You do not need to apply early stopping. Plot the training and test data, and the predictions of the learned NN on the test data. You should get good results. Comment your results.
+
+```{r}
+
+# The data
+set.seed(123)
+data_runif <- runif(500, min = 0, max = 10)
+data_sin <- sin(data_runif)
+data_df <- data.frame(runif = data_runif, sin = data_sin)
+
+
+
+# Split the data into training and test
+n <- dim(data_df)[1]
+id <- sample(1:n, 25) # 25 training points
+
+tr_data <- data_df[id, ]
+te_data <- data_df[-id, ]
+
+
+```
+
+```{r}
+
+# Neural Network
+nn_model <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10))
+
+predictions <- predict(nn_model, newdata = te_data) %>% as.vector()
+
+# Adding the predictions to the data.frame with test data
+te_data$predicted_sin <- predictions
+
+
+```
+
+```{r}
+
+tr_plot <- ggplot(tr_data, aes(runif, sin)) + geom_point() + theme_bw() +
+  labs(x = "runif[0,10]", y = "sin(runif[0,10])")
+
+te_plot <- ggplot(te_data, aes(runif, sin)) + geom_point() + theme_bw() +
+  labs(x = "runif[0,10]", y = "sin(runif[0,10])")
+
+
+pred_plot <- ggplot(te_data, aes(runif, predicted_sin)) + geom_point() + theme_bw() +
+  labs(x = "runif[0,10]", y = "sin(runif[0,10])")
+
+plot_grid(tr_plot, te_plot,pred_plot, labels = c("Traning","Test","Prediction"),
+          label_size = 12, nrow = 3)
+
+
+```
+
+The neural network have successfully learned the sin(x) pattern as the test plot and prediction plot follows each other very well.
+
+
+
+\clearpage
+
+## 3.2
+
+In question (1), you used the default logistic (a.k.a. sigmoid) activation function, i.e. act.fct = "logistic". Repeat question (1) with the following custom activation functions: $h_1(x) = x, h_2(x) = max{0, x}$ and $h_3(x) = \text{ln}(1 + exp x)$ (a.k.a. linear, ReLU and softplus). See the help file of the neuralnet package to learn how to use custom activation functions. Plot and comment your results.
+
+
+```{r}
+
+# Three custom activation function
+h1 <- function(x) x
+h2 <- function(x) ifelse(x > 0, x, 0) # same as max(0,x)
+h3 <- function(x) log(1 + exp(x))
+
+# https://stackoverflow.com/questions/34532878/package-neuralnet-in-r-rectified-linear-unit-relu-activation-function
+
+# Neural Network
+nn_model_h1 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h1)
+nn_model_h2 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h2, threshold = 0.10) # NEED TO CHECK THIS
+nn_model_h3 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h3)
+
+predictions_h1 <- predict(nn_model_h1, newdata = te_data) %>% as.vector()
+predictions_h2 <- predict(nn_model_h2, newdata = te_data) %>% as.vector()
+predictions_h3 <- predict(nn_model_h3, newdata = te_data) %>% as.vector()
+
+# Adding the predictions to the data.frame with test data
+te_data$predicted_sin_h1 <- predictions_h1
+te_data$predicted_sin_h2 <- predictions_h2
+te_data$predicted_sin_h3 <- predictions_h3
+
+
+```
+
+
+```{r}
+
+h1_plot <- ggplot(te_data, aes(runif, predicted_sin_h1)) + geom_point() + theme_bw() +
+  labs(x = "runif[0,10]", y = "sin(runif[0,10])")
+
+h2_plot <- ggplot(te_data, aes(runif, predicted_sin_h2)) + geom_point() + theme_bw() +
+  labs(x = "runif[0,10]", y = "sin(runif[0,10])")
+
+h3_plot <- ggplot(te_data, aes(runif, predicted_sin_h3)) + geom_point() + theme_bw() +
+  labs(x = "runif[0,10]", y = "sin(runif[0,10])")
+
+plot_grid(h1_plot,h2_plot, h3_plot, labels = c("h1(x)","h2(x)","h3(x)"),
+          label_size = 12, nrow = 3, label_y = 1.02)
+
+
+```
+
+
+
+## 3.3
+
+Sample 500 points uniformly at random in the interval [0, 50], and apply the sine function to each point. Use the NN learned in question (1) to predict the sine function value for these new 500 points. You should get mixed results. Plot and comment your results.
+
+
+```{r}
+
+# The data
+set.seed(123)
+data_runif <- runif(500, min = 0, max = 50)
+data_sin <- sin(data_runif)
+data_df <- data.frame(runif = data_runif, sin = data_sin)
+
+
+
+# Split the data into training and test
+n <- dim(data_df)[1]
+id <- sample(1:n, 25) # 25 training points
+
+tr_data <- data_df[id, ]
+te_data <- data_df[-id, ]
+
+
+
+# Neural Network
+# Needed to change threshold to 0.02 in order for the NN to calcultae the weights
+nn_model <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10),
+                      threshold = 0.02) 
+
+predictions <- predict(nn_model, newdata = te_data) %>% as.vector()
+
+# Adding the predictions to the data.frame with test data
+te_data$predicted_sin <- predictions
+```
+
+
+```{r}
+
+
+pred_plot <- ggplot(te_data, aes(runif, predicted_sin)) + geom_point() + theme_bw() +
+  labs(x = "runif[0,50]", y = "sin(runif[0,5  0])")
+
+pred_plot
+
+
+```
+
+## 3.4
+
+In question (3), the predictions seem to converge to some value. Explain why this happens. To answer this question, you may need to get access to the weights of the NN learned. You can do it by running *nn* or *nn*$*weights* where *nn* is the NN learned.
+
+
+```{r}
+
+nn_model$weights
+
+
+```
+
+
+
+## 3.5
+
+Sample 500 points uniformly at random in the interval [0, 101010], and apply the sine func-tion to each point. Use all these points as training points for learning a NN that tries to predict $x$ from $sin(x)$, i.e. unlike before when the goal was to predict $sin(x)$ from $x$. Use the learned NN to predict the training data. You should get bad results. Plot and comment your results. Help: Some people get a convergence error in this ques- tion. It can be solved by stopping the training before reaching convergence by setting threshold = 0.1.
+
+
+
+```{r}
+
+
+set.seed(1234567890)
+Var <- runif(500, 0, 10)
+mydata <- data.frame(Var, Sin = sin(Var))
+tr <- mydata[1:25,] # Training
+te <- mydata[26:500,] # Test
+
+# Random initialization of the weights in the interval [-1, 1]
+winit <- # Your code here
+nn <- neuralnet# (Your code here)
+
+
+# Plot of the training data (black), test data (blue), and predictions (red)
+# plot(tr, cex = 2)
+# points(te, col = "blue", cex = 1)
+# points(te[,1], predict(nn, te), col = "red", cex = 1)
+
+
+```
+
+
+
+
+
+
+
