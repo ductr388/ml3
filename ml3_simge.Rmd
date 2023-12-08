@@ -1,0 +1,163 @@
+---
+title: "Machine Learning Question 1"
+author: "Simge Cinar"
+date: "2023-12-08"
+output:
+  pdf_document: 
+    latex_engine: xelatex
+    fig_width: 5.5
+    fig_height: 3.5
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(geosphere)
+```
+
+# Question 1: KERNEL METHODS
+**Question:** Implement a kernel method to predict the hourly temperatures for a date and place in Sweden. To do so, you are provided with the files stations.csv and temps50k.csv. These files contain information about weather stations and temperature measurements in the stations at different days and times. The data have been kindly provided by the Swedish Meteorological and Hydrological Institute (SMHI). \
+You are asked to provide a temperature forecast for a date and place in Sweden. The forecast should consist of the predicted temperatures from 4 am to 24 pm in an interval of 2 hours. Use a kernel that is the sum of three Gaussian kernels:
+
+\begin{itemize}
+  \item The first to account for the physical distance from a station to the point of interest. For this purpose, use the function distHaversine from the R package geosphere.
+  \item The second to account for the distance between the day a temperature measurement was made and the day of interest.
+  \item The third to account for the distance between the hour of the day a temperature mea- surement was made and the hour of interest.
+\end{itemize}
+
+Choose an appropriate smoothing coefficient or width for each of the three kernels above. No cross-validation should be used. Instead, choose manually a width that gives large kernel values to closer points and small values to distant points. Show this with a plot of the kernel value as a function of distance. Help: Note that the file temps50k.csv may contain temper- ature measurements that are posterior to the day and hour of your forecast. You must filter such measurements out, i.e. they cannot be used to compute the forecast. \
+
+Finally, repeat the exercise above by combining the three kernels into one by multiplying them, instead of summing them up. Compare the results obtained in both cases and elaborate on why they may differ.
+
+**Answer:** The code is as folllows:
+```{r, warning=FALSE}
+set.seed(1234567890)
+stations <- read.csv("stations.csv", fileEncoding = "latin1")
+temps <- read.csv("temps50k.csv")
+st <- merge(stations,temps,by="station_number") # merged dataframe
+
+# Create a new column with date and time
+st$datetime <- as.POSIXct(paste(as.character(st$date), as.character(st$time)), 
+                          format = "%Y-%m-%d %H:%M:%S", tz = "GMT")
+
+# choose manually a width that gives large kernel values to closer points 
+# and small values to distant points
+h_distance <- 1000
+h_date <- 50
+h_time <- 3
+
+# Point to predict
+a <- 	56.8526
+b <- 13.8822
+date <- "2007-06-30"
+
+# Predict for each of these times
+times <- c("04:00:00", "06:00:00", "08:00:00", "10:00:00", "12:00:00", 
+           "14:00:00", "16:00:00", "18:00:00", "20:00:00", "22:00:00", 
+           "24:00:00") 
+```
+
+```{r}
+gaussian_kernel <- function(diff_vector, l){ 
+  kernel <- exp(-(diff_vector / (2*(l^2))))
+  return(kernel)
+}
+```
+
+```{r, fig.align='center'}
+# Bandwith plot
+target_datetime <- as.POSIXct(paste(date, times[5]), format = "%Y-%m-%d %H:%M:%S", tz = "GMT")
+datetime_diff <- target_datetime - st$datetime
+st_new <- st[which(datetime_diff >= 0), ]
+
+
+distance_new <- distHaversine(cbind(st_new$longitude, st_new$latitude), c(a, b))
+date_new <- floor(as.numeric(target_datetime - st_new$datetime) / 24)
+time_new <- as.numeric(target_datetime - st_new$datetime) %% 24 # we don't have minutes
+
+distance_kernel <- gaussian_kernel(distance_new, h_distance)
+date_kernel <- gaussian_kernel(date_new, h_date)
+time_kernel <- gaussian_kernel(time_new, h_time)
+```
+
+The bandwith plots can be seen below. As the distance increases, kernel value decreases. Bandwith values for distance, date and time is selected as 1000, 50, 3 respectively. 
+```{r, fig.align='center'}
+plot(distance_new, distance_kernel)
+```
+
+```{r, fig.align='center'}
+plot(date_new, date_kernel)
+```
+
+```{r, fig.align='center'}
+plot(time_new, time_kernel)
+```
+
+Prediction plot with summation of kernels can be seen below.
+```{r, fig.align='center'}
+# SUMMATION OF KERNELS
+temp <- vector(length=length(times))
+
+for (i in 1:length(times)){
+  target_datetime <- as.POSIXct(paste(date, times[i]), format = "%Y-%m-%d %H:%M:%S", tz = "GMT")
+  datetime_diff <- target_datetime - st$datetime
+  
+  st_new <- st[which(datetime_diff >= 0), ] # exclude posterior rows
+  
+  distance_new <- distHaversine(cbind(st_new$longitude, st_new$latitude), c(a, b))
+  date_new <- floor(as.numeric(target_datetime - st_new$datetime) / 24)
+  time_new <- as.numeric(target_datetime - st_new$datetime) %% 24 # we don't have minutes
+  
+  weight_distance <- gaussian_kernel(distance_new, h_distance)
+  weight_date <- gaussian_kernel(date_new, h_date)
+  weight_time <- gaussian_kernel(time_new, h_time)
+  
+  w <- weight_distance + weight_date + weight_time
+  total_weight <- sum(w)
+  weighted_sum <- sum(w * st_new$air_temperature) 
+  
+  temp[i] <- weighted_sum/total_weight
+}
+
+plot(temp, type="o", xaxt="n", ylab = "Temperature", xlab = " ")
+axis(side = 1, at = 1:length(times), labels = times, las = 2) 
+grid()
+```
+
+Prediction plot with multiplication of kernels can be seen below.
+```{r, fig.align='center'}
+# MULTIPLIATION OF KERNELS
+temp <- vector(length=length(times))
+
+for (i in 1:length(times)){
+  target_datetime <- as.POSIXct(paste(date, times[i]), format = "%Y-%m-%d %H:%M:%S", tz = "GMT")
+  datetime_diff <- target_datetime - st$datetime
+  
+  st_new <- st[which(datetime_diff >= 0), ]
+  
+  distance_new <- distHaversine(cbind(st_new$longitude, st_new$latitude), c(a, b))
+  date_new <- floor(as.numeric(target_datetime - st_new$datetime) / 24)
+  time_new <- as.numeric(target_datetime - st_new$datetime) %% 24 # we don't have minutes
+  
+  weight_distance <- gaussian_kernel(distance_new, h_distance)
+  weight_date <- gaussian_kernel(date_new, h_date)
+  weight_time <- gaussian_kernel(time_new, h_time)
+  
+  w <- weight_distance * weight_date * weight_time
+  total_weight <- sum(w)
+  weighted_sum <- sum(w * st_new$air_temperature) 
+  
+  temp[i] <- weighted_sum/total_weight
+}
+
+plot(temp, type="o", xaxt="n", ylab = "Temperature", xlab = " ")
+axis(side = 1, at = 1:length(times), labels = times, las = 2) 
+grid()
+```
+
+Multiplying kernels works better than summing kernels. In the multiplication, if the weights are high it means that it puts more emphasis on that row and if weights are less, it puts less emphasis on that row.
+
+
+
+
+
