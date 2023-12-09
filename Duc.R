@@ -15,12 +15,12 @@ trva <- spam[1:3800, ]
 te <- spam[3801:4601, ] 
 
 # Divided data according to:
-# Train_30:    3000 
+# Train:    3000 
 # Validation:  800 
 # Test:        800
 
 # Have another data division:
-# Train_38: 3800
+# Train_val: 3800
 # Test :    800
 
 # Finds the best value of C by using validation data
@@ -34,7 +34,7 @@ for(i in seq(by,5,by)){
 }
 
 
-# Model trained on train_30, error on validation <- not good.
+# Model trained on train, error on validation <- not good.
 filter0 <- ksvm(type~.,data=tr,kernel="rbfdot",kpar=list(sigma=0.05),C=which.min(err_va)*by,scaled=FALSE)
 mailtype <- predict(filter0,va[,-58])
 t <- table(mailtype,va[,58])
@@ -42,14 +42,15 @@ err0 <- (t[1,2]+t[2,1])/sum(t)
 err0
 
 
-# Model trained on train_30, error on test <- Candidate 
+
+# Model trained on train, error on test <- Candidate 
 filter1 <- ksvm(type~.,data=tr,kernel="rbfdot",kpar=list(sigma=0.05),C=which.min(err_va)*by,scaled=FALSE)
 mailtype <- predict(filter1,te[,-58])
 t <- table(mailtype,te[,58])
 err1 <- (t[1,2]+t[2,1])/sum(t)
 err1
 
-# Model trained on train_38, error on test <- Candidate? We are however using 800 obs used from validation to find c... 
+# Model trained on train_val, error on test <- Candidate? We are however using 800 obs used from validation to find c... 
 filter2 <- ksvm(type~.,data=trva,kernel="rbfdot",kpar=list(sigma=0.05),C=which.min(err_va)*by,scaled=FALSE)
 mailtype <- predict(filter2,te[,-58])
 t <- table(mailtype,te[,58])
@@ -63,6 +64,11 @@ t <- table(mailtype,te[,58])
 err3 <- (t[1,2]+t[2,1])/sum(t)
 err3
 
+
+err0
+err1
+err2
+err3
 # Questions
 
 # 1. Which filter do we return to the user ? filter0, filter1, filter2 or filter3? Why?
@@ -73,21 +79,38 @@ err3
 # which the error is using.
 # Err1: 0.08489388, accurate generalizaton error of the filter. We are using data never seen by the model.
 # Err2: 0.082397, not so accurate generalization error. Data used to find hyperparameter c is reused to train the model. => overfitting?
-# Err3: 0.02122347, not accurate generaizaton error. Test data is used as training data also. Generalization error is smaller then it is for new data. 
+# Err3: 0.02122347, not accurate generalizaton error. Test data is used as training data also. Generalization error is smaller then it is for new data. 
 
 # 3. Implementation of SVM predictions.
 
+# Alpha-hat found from sv, where sv are index for the support vectors (observations that are support vectors). 
+x <- spam[sv, -58] # Remove y value. 
+# The 10 observations we need to predict
+x_stars <- spam[1:10, -58]
+x_star <- x_stars[1]
+
+
+
+rbfkernel <- rbfdot(sigma = 0.05)
+
+
 sv<-alphaindex(filter3)[[1]]
 co<-coef(filter3)[[1]]
-inte<- - b(filter3)
-k<-NULL
+intercept <- - b(filter3)
+k<-c()
 for(i in 1:10){ # We produce predictions for just the first 10 points in the dataset.
   k2<-NULL
   for(j in 1:length(sv)){
-    k2<- # Your code here
+    k2[j] <- co[j]*rbfkernel(unlist(x[j,]), unlist(x_stars[i,]))
   }
-  k<-c(k, # Your code here)
+  prediction <- intercept + sum(k2)
+  prediction
+  k[i]<- prediction
 }
+
+
+
 
 k
 predict(filter3,spam[1:10,-58], type = "decision")
+
