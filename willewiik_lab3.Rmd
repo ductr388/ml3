@@ -70,10 +70,11 @@ library(knitr)
 library(dplyr)
 library(neuralnet)
 library(cowplot)
-# knitr::opts_chunk$set(
-#   echo = TRUE, 
-#   fig.width = 4.5, 
-#   fig.height = 3)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  fig.width = 4.5,
+  fig.height = 4,
+  fig.align = "center")
 ```
 
 
@@ -105,13 +106,13 @@ winit <- runif(31, min = -1, max = 1)
 ```{r}
 
 # Neural Network
-nn_model <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), startweights = winit)
+nn_model_assignment_1 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), startweights = winit)
 
-predictions <- predict(nn_model, newdata = te_data) %>% as.vector()
+predictions <- predict(nn_model_assignment_1, newdata = te_data) %>% as.vector()
 
 ```
 
-```{r}
+```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions"}
 
 plot(tr_data, cex = 2, xlab = "runif[0,10]", ylab = "Sin(x)")
 points(te_data, col = "blue", cex = 1)
@@ -140,12 +141,10 @@ h1 <- function(x) x
 h2 <- function(x) ifelse(x > 0, x, 0) # same as max(0,x)
 h3 <- function(x) log(1 + exp(x))
 
-# https://stackoverflow.com/questions/34532878/package-neuralnet-in-r-rectified-linear-unit-relu-activation-function
 
 # Neural Network
 nn_model_h1 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h1, startweights = winit)
-nn_model_h2 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h2, startweights = winit,
-                        threshold = 0.15) # NEED TO CHECK THIS
+nn_model_h2 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h2, startweights = winit)
 nn_model_h3 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h3, startweights = winit)
 
 predictions_h1 <- predict(nn_model_h1, newdata = te_data) %>% as.vector()
@@ -157,7 +156,7 @@ predictions_h3 <- predict(nn_model_h3, newdata = te_data) %>% as.vector()
 ```
 
 
-```{r}
+```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions for first activation function (linear)"}
 
 plot(tr_data, cex = 2, xlab = "runif[0,10]", ylab = "Sin(x)")
 points(te_data, col = "blue", cex=1)
@@ -168,7 +167,9 @@ col = c("black", "blue", "red"), pch = 16)
 
 ```
 
-```{r}
+In figure 2, we can see that the prediction is just a straight line and does not not fit the test data well. This is because the linear activation function can only represent linear mappings between input and output. Therefore, the prediction does not fit the test data well because the data is non-linear.
+
+```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions for second activation function (ReLu)"}
 
 plot(tr_data, cex = 2, xlab = "runif[0,10]", ylab = "Sin(x)")
 points(te_data, col = "blue", cex = 1)
@@ -177,9 +178,12 @@ legend("bottomright", legend = c("Train", "Test", "Prediction"),
 col = c("black", "blue", "red"), pch = 16)
 
 
+
 ```
 
-```{r}
+In figure 3, when we use ReLu as a activation function we get better result than the linear activation function, but still this is very bad fit to the test data.
+
+```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions for third activation function"}
 
 plot(tr_data, cex = 2, xlab = "runif[0,10]", ylab = "Sin(x)")
 points(te_data, col = "blue", cex=1)
@@ -190,6 +194,9 @@ col = c("black", "blue", "red"), pch = 16)
 
 
 ```
+
+In figure 4, we use activation function softmax $\text{ln}(1 + exp x)$ and the prediction seems to follow the the test data well. This activation function has the best prediction between the three activation function we have used.
+
 
 
 
@@ -205,33 +212,28 @@ set.seed(1234567890)
 data_runif <- runif(500, min = 0, max = 50)
 data_df <- data.frame(runif = data_runif, sin =  sin(data_runif))
 
-# Random initialization of the weights in the interval [-1, 1], 20 weights + 11 bias
-winit <- runif(31, min = -1, max = 1)
-
-tr_data <- data_df[1:25,]
-te_data <-  data_df[26:500,] 
 
 
 
-# Neural Network
-# Needed to change threshold to 0.02 in order for the NN to calcultae the weights
-nn_model <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10)) 
 
-predictions <- predict(nn_model, newdata = te_data) %>% as.vector()
+predictions <- predict(nn_model_assignment_1, newdata = data_df) %>% as.vector()
 
 ```
 
 
-```{r}
+```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions with runif[0,50]"}
 
 
-plot(tr_data, cex = 2, xlab = "runif[0,50]", ylab = "Sin(x)")
-points(te_data, col = "blue", cex=1)
-points(te_data[,1], predictions, col = "red", cex=1)
-legend("bottomright", legend = c("Train", "Test", "Prediction"),
+plot(tr_data, cex = 2, xlab = "runif[0,50]", ylab = "Sin(x)", ylim = c(-12, 2), xlim = c(0,50))
+points(data_df, col = "blue", cex=1)
+points(data_df[,1], predictions, col = "red", cex=1)
+legend("bottomleft", legend = c("Train", "Test", "Prediction"),
 col = c("black", "blue", "red"), pch = 16)
 
 ```
+
+In figure 5, the predictions follows the test data well between values from 0 to 10.
+This makes sense, because the NN learned in question (1) trained values between 0 to 10.
 
 ## 3.4
 
@@ -240,9 +242,22 @@ In question (3), the predictions seem to converge to some value. Explain why thi
 
 ```{r}
 
-nn_model$w
+nn_model_assignment_1$weights
 
+sigmoid <- function(x){
+return(1 / (1 + exp(-x)))
+}
 
+#Define weight matrix for layer 1
+W1 <- nn_model_assignment_1$weights[[1]][[1]][2,]
+# Define offset vector for layer 1
+b1 <- nn_model_assignment_1$weights[[1]][[1]][1,]
+# Get q: Test with input 100
+q <- sigmoid(W1 * 200 + b1)
+#
+b2 <- nn_model_assignment_1$weights[[1]][[2]][1,]
+W2 <- nn_model_assignment_1$weights[[1]][[2]][2:11,]
+cat("The value will converge to:", W2%*%q + b2, "as the input increases")
 
 ```
 
@@ -250,7 +265,7 @@ nn_model$w
 
 ## 3.5
 
-Sample 500 points uniformly at random in the interval [0, 10], and apply the sine func-tion to each point. Use all these points as training points for learning a NN that tries to predict $x$ from $sin(x)$, i.e. unlike before when the goal was to predict $sin(x)$ from $x$. Use the learned NN to predict the training data. You should get bad results. Plot and comment your results. Help: Some people get a convergence error in this ques- tion. It can be solved by stopping the training before reaching convergence by setting threshold = 0.1.
+Sample 500 points uniformly at random in the interval [0, 10], and apply the sine func-tion to each point. Use all these points as training points for learning a NN that tries to predict $x$ from $sin(x)$, i.e. unlike before when the goal was to predict $sin(x)$ from $x$. Use the learned NN to predict the training data. You should get bad results. Plot and comment your results. Help: Some people get a convergence error in this question. It can be solved by stopping the training before reaching convergence by setting threshold = 0.1.
 
 
 
@@ -268,8 +283,6 @@ te_data <-  data_df[26:500,]
 winit <- runif(31, min = -1, max = 1)
 
 
-
-
 ```
 
 
@@ -284,23 +297,25 @@ predictions <- predict(nn_model, newdata = te_data) %>% as.vector()
 
 ```
 
-```{r}
+```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions, x ~ sin(x)"}
 
-plot(tr_data, cex = 2, ylab = "runif[0,10]", xlab = "Sin(x)")
+plot(tr_data, cex = 2, ylab = "runif[0,10]", xlab = "Sin(x)", ylim = c(-2, 11))
 points(te_data, col = "blue", cex = 1)
 points(predictions, te_data[,1], col = "red", cex = 1)
-legend("bottomleft", legend = c("Train", "Test", "Prediction"),
+legend("topleft", legend = c("Train", "Test", "Prediction"),
 col = c("black", "blue", "red"), pch = 16)
 
-
-plot(tr_data[,2], tr_data[,1], cex = 2, ylab = "runif[0,10]", xlab = "Sin(x)")
-points(te_data[,2], te_data[,1], col = "blue", cex = 1)
-points(te_data[,1], predictions, col = "red", cex = 1)
-legend("bottomleft", legend = c("Train", "Test", "Prediction"),
-col = c("black", "blue", "red"), pch = 16)
+# 
+# plot(tr_data[,2], tr_data[,1], cex = 2, ylab = "runif[0,10]", xlab = "Sin(x)")
+# points(te_data[,2], te_data[,1], col = "blue", cex = 1)
+# points(te_data[,1], predictions, col = "red", cex = 1)
+# legend("bottomleft", legend = c("Train", "Test", "Prediction"),
+# col = c("black", "blue", "red"), pch = 16)
 
 ```
 
+In figure 6, we can see that the predicted values does not fit the a test data at all.
+This is because the $sin(x)$ function can return same value for different $x$ values and therefore the NN gets confused.
 
 
 
