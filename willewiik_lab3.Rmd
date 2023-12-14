@@ -224,7 +224,7 @@ predictions <- predict(nn_model_assignment_1, newdata = data_df) %>% as.vector()
 ```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions with runif[0,50]"}
 
 
-plot(tr_data, cex = 2, xlab = "runif[0,50]", ylab = "Sin(x)", ylim = c(-12, 2), xlim = c(0,50))
+plot(tr_data, cex = 2, xlab = "runif[0,50]", ylab = "Sin(x)", ylim = c(-11, 2), xlim = c(0,50))
 points(data_df, col = "blue", cex=1)
 points(data_df[,1], predictions, col = "red", cex=1)
 legend("bottomleft", legend = c("Train", "Test", "Prediction"),
@@ -239,28 +239,72 @@ This makes sense, because the NN learned in question (1) trained values between 
 
 In question (3), the predictions seem to converge to some value. Explain why this happens. To answer this question, you may need to get access to the weights of the NN learned. You can do it by running *nn* or *nn*$*weights* where *nn* is the NN learned.
 
+**Answer:**
+To understand why the predictions seem to converge to some value we need to look at the formula for the full NN model (Lindholm et al., 2022).
+
+$$\mathbf{q} = h(\mathbf{W}^{(1)}\mathbf{x}+ \mathbf{b}^{1})$$
+$$\hat{y} =\mathbf{W}^{(2)}\mathbf{q}+ \mathbf{b}^{2} $$
+
+* $h$ is the  activation function $h(z) = \frac{1}{1+e^{-z}}$
+
+* $\mathbf{W}$ is the weight matrix.
+
+* $\mathbf{x}$ is the input.
+
+* $\mathbf{b}$ is the bias.
+
+* $\hat{y}$ is the prediction.
+
+In the table below we print out the weights and bias from the NN.
 
 ```{r}
 
-nn_model_assignment_1$weights
-
-sigmoid <- function(x){
-return(1 / (1 + exp(-x)))
-}
-
-#Define weight matrix for layer 1
 W1 <- nn_model_assignment_1$weights[[1]][[1]][2,]
-# Define offset vector for layer 1
 b1 <- nn_model_assignment_1$weights[[1]][[1]][1,]
-# Get q: Test with input 100
-q <- sigmoid(W1 * 200 + b1)
-#
-b2 <- nn_model_assignment_1$weights[[1]][[2]][1,]
+
 W2 <- nn_model_assignment_1$weights[[1]][[2]][2:11,]
-cat("The value will converge to:", W2%*%q + b2, "as the input increases")
+b2 <- nn_model_assignment_1$weights[[1]][[2]][1,]
+
+mat <- matrix("", 10, 4)
+colnames(mat) <- c("W1", "W2", "b1", "b2")
+
+mat[1:10,1] <- round(W1,2)
+mat[1:10,2] <- round(W2,2)
+mat[1:10,3] <- round(b1,2)
+mat[1,4] <-round(b2,2)
+
+kable(mat, caption = "The weights and the bias")
 
 ```
 
+
+Now we calculate $\mathbf{q}$ by using $\mathbf{W}^{(1)}$, $\mathbf{x}$ (some high number, we use 50) and $\mathbf{b}^{1}$.
+
+
+```{r}
+
+# Activation function
+logistic <- function(x){
+  out <- 1 / (1 + exp(-x))
+ return(out)
+}
+
+# Input (some high value)
+x <- 50 
+q <- logistic(W1 * x + b1)
+
+kable(q, digits = 0, col.names = "q")
+
+# W2 %*% q + b2
+```
+
+We know that the logistic function are going to return 1 if the input is large and 0 if the input is small and that is why the $\mathbf{q}$ are going to have the same output if we have a large value for $x$. This is because all positive weights from $\mathbf{W}^{(1)}$ become large, and negative weights become small as $x$ increases.
+
+Now we can calculate $\hat{y}$, and because there are seven 0:s and three 1:s on index 1,3,5 , we can write:
+
+$$\hat{y}=W_1^{2} + W_3^{2} + W_5^{2} + \mathbf{b}^{2} = 0.77 + (-16.05) + 4.31 + (-0.11) = -10.75$$
+
+This tells us that the NN should converge to value -10.75 when input get large which we can see in figure 5.
 
 
 ## 3.5
@@ -305,12 +349,7 @@ points(predictions, te_data[,1], col = "red", cex = 1)
 legend("topleft", legend = c("Train", "Test", "Prediction"),
 col = c("black", "blue", "red"), pch = 16)
 
-# 
-# plot(tr_data[,2], tr_data[,1], cex = 2, ylab = "runif[0,10]", xlab = "Sin(x)")
-# points(te_data[,2], te_data[,1], col = "blue", cex = 1)
-# points(te_data[,1], predictions, col = "red", cex = 1)
-# legend("bottomleft", legend = c("Train", "Test", "Prediction"),
-# col = c("black", "blue", "red"), pch = 16)
+
 
 ```
 
