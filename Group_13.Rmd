@@ -1,0 +1,565 @@
+---
+title: "Computer lab 3 block 1"
+author:
+- Simge Cinar
+- Duc Tran
+- William Wiik
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    df_print: paged
+  fig_caption: yes
+  number_sections: yes
+  bookdown::pdf_document2: default
+geometry: top=100pt,bottom=100pt,left=68pt,right=66pt
+subtitle: 732A99
+header-includes:
+- \usepackage{booktabs}
+- \usepackage{float}
+- \usepackage{longtable}
+- \usepackage{caption}
+- \usepackage{fancyhdr}
+- \usepackage{titling}
+- \usepackage[swedish, english]{babel}
+- \renewcommand{\headrulewidth}{0pt}
+- \renewcommand{\and}{\\}
+- \pretitle{\centering\vspace{0cm}{\large Laboration report in Machine Learning \par}\vspace{4cm}\Huge\textbf}
+- \posttitle{\vspace{1cm}\large\textbf{}\par}
+- \preauthor{\centering\vspace{4cm}\normalsize}
+- \postauthor{\par\vspace{3cm}}
+- \predate{\centering{\normalsize Division of Statistics and Machine Learning \\ Department
+  of Computer Science \\ Linköping University \par}}
+- \postdate{\par\vspace{2cm}}
+- \raggedbottom
+---
+
+<!-- <!-- Väljer språk till svenska för automatiska titlar -->
+<!-- \selectlanguage{swedish} -->
+
+<!-- Byter språket på figur- och tabellbeskrivningar till angivna namn -->
+\captionsetup[table]{name = Table}
+
+
+<!-- Anger sidnumreringens position -->
+\fancyhf{}
+\fancyfoot[C]{\thepage}
+\pagestyle{fancy}
+
+<!-- Tar bort sidnumrering för förteckningar och titelsidan -->
+\pagenumbering{gobble}
+
+<!-- Anger sidbrytning -->
+\clearpage
+
+<!-- Skapar en innehållsförteckning och anger djupet av rubrikerna som ska visas -->
+\setcounter{tocdepth}{3}
+
+<!-- Anger sidbrytning -->
+\clearpage
+
+<!-- Börjar sidnumreringen på sida 1 efter att alla förteckningar visats -->
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+<!-- Börjar med kapitel 1 -->
+
+```{r options, echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(knitr)
+library(dplyr)
+library(neuralnet)
+library(cowplot)
+#library(kableExtra)
+knitr::opts_chunk$set(
+  echo = TRUE, 
+  fig.width = 4.5, 
+  fig.height = 3)
+```
+
+
+# Assignment 1. Explicit regularization
+
+
+
+```{r}
+
+
+```
+
+
+
+# Assignment 2. Support Vector Machines
+
+In this assignment, the data set "spam" from the R-package kernlab is used.
+The dataset consists of 4601 observations, 1 response variable labelling the observation
+spam or not spam, and 57 numerical variables. 
+
+## Question 2.1
+
+**Question:** Which filter do you return to the user? *filter0*, *filter1*, *filter2* or *filter3*?
+Why?
+
+**Answer:** In this task data was divided into four different data sets:
+
+* Train (3000 observations)
+* Validation (800 observations)
+* Test (801 observations)
+* Train+Validation (3800 observations)
+
+where the last dataset is training and validation combined. The code used to train
+each filter is as follows:
+
+```{r, message=FALSE}
+# All the following code is supplied by the task.
+#---------------------------------------------------------------#
+library(kernlab)
+set.seed(1234567890)
+
+data(spam)
+foo <- sample(nrow(spam))
+spam <- spam[foo,]
+spam[,-58]<-scale(spam[,-58])
+tr <- spam[1:3000, ]
+va <- spam[3001:3800, ]
+trva <- spam[1:3800, ]
+te <- spam[3801:4601, ] 
+
+
+# Finds the best value of C by using validation data
+by <- 0.3
+err_va <- NULL
+for(i in seq(by,5,by)){
+  filter <- ksvm(type~.,data=tr,kernel="rbfdot",kpar=list(sigma=0.05),C=i,scaled=FALSE)
+  mailtype <- predict(filter,va[,-58])
+  t <- table(mailtype,va[,58])
+  err_va <-c(err_va,(t[1,2]+t[2,1])/sum(t))
+}
+
+filter0 <- ksvm(type~.,data=tr,kernel="rbfdot",kpar=list(sigma=0.05),C=which.min(err_va)*by,scaled=FALSE)
+mailtype <- predict(filter0,va[,-58])
+t <- table(mailtype,va[,58])
+err0 <- (t[1,2]+t[2,1])/sum(t)
+
+filter1 <- ksvm(type~.,data=tr,kernel="rbfdot",kpar=list(sigma=0.05),C=which.min(err_va)*by,scaled=FALSE)
+mailtype <- predict(filter1,te[,-58])
+t <- table(mailtype,te[,58])
+err1 <- (t[1,2]+t[2,1])/sum(t)
+
+filter2 <- ksvm(type~.,data=trva,kernel="rbfdot",kpar=list(sigma=0.05),C=which.min(err_va)*by,scaled=FALSE)
+mailtype <- predict(filter2,te[,-58])
+t <- table(mailtype,te[,58])
+err2 <- (t[1,2]+t[2,1])/sum(t)
+
+filter3 <- ksvm(type~.,data=spam,kernel="rbfdot",kpar=list(sigma=0.05),C=which.min(err_va)*by,scaled=FALSE)
+mailtype <- predict(filter3,te[,-58])
+t <- table(mailtype,te[,58])
+err3 <- (t[1,2]+t[2,1])/sum(t)
+#---------------------------------------------------------------#
+```
+
+From the code, the value of C for each filter was found by using the validation data set. 
+In table X, the data the filters were trained on, the data used to estimate of the
+generalization error, and the error are presented. 
+
+```{r, echo=FALSE}
+filter_0 <- c("training", "validation", err0)
+filter_1 <- c("training", "test", err1)
+filter_2 <- c("train+val","test", err2)
+filter_3 <- c("all data", "test", err3)
+table_data <- data.frame(rbind(filter_0, filter_1, filter_2, filter_3))
+colnames(table_data) <- c("Training data", "Testing data", "Error on testing data")
+rownames(table_data) <- c("Filter 0", "Filter 1", "Filter 2", "Filter 3")
+table_data$`Error on testing data` <- round(as.numeric(table_data$`Error on testing data`), 4)
+kable(table_data, caption = "Summarized information about filters")
+```
+
+
+From table X, filter 0 used training data to train, and tested the filter on validation data.
+Filter 0 can be returned but we will not be able to give an unbiased estimate of the generalization error.  
+Filter 1 used training data to train, and tested the filter on test data, filter 1 only
+used each observation of data once and the estimate of the generalization error will be unbiased.  
+Filter 2 used training and validation data to train. Since validation data was used to find
+the parameter c, filter 2 will be a bit more overfitted on the training data compared to filter 0 and 1.  
+Filter 3 used all data to train, this means the model is a overfitted on training data and we will
+not be able to give an unbiased estimate of the generalization error. 
+
+In conclusion, the best filter to return is filter 1 since this is the only filter
+that only used each observation once. 
+
+
+\clearpage
+
+## Question 2.2
+
+**Question:** What is the estimate of the generalization error of the filter returned to the user? *err0*,
+*err1*, *err2* or *err3*? Why?
+
+**Answer:** In question 2.1, we concluded that filter 0, filter 2, and filter 3 used
+each observation more than once, and therefore the filter can not give an unbiased
+estimate of the generalization error. The estimate of the generalization error of the filter should always be
+the error estimate of the filter we return. In this case filter 1 was chosen to be
+returned in question 2.1. The generalization error we returned is therefore 0.0849,
+which means that around 8.49% of future emails will be wrongly classified by this
+filter. 
+
+## Question 2.3
+
+**Question:** Once a SVM has been fitted to the training data, a new point is essentially classified
+according to the sign of a linear combination of the kernel function values between the
+support vectors and the new point. You are asked to implement this linear combination
+for *filter3*. You should make use of the functions *alphaindex*, *coef* and *b *that
+return the indexes of the support vectors, the linear coefficients for the support vectors,
+and the negative intercept of the linear combination. See the help file of the *kernlab*
+package for more information. You can check if your results are correct by comparing
+them with the output of the function predict where you set type = "decision".
+Do so for the first 10 points in the *spam* dataset. Feel free to use the template provided
+in the *Lab3Block1 2021 SVMs St.R file*.
+
+
+**Answer:** In SVM a new observation ($x_\star$) is predicted as:
+
+\begin{align}
+\hat y (\mathbf{x_\star}) = \hat \alpha^T \mathbf{K(X, x_\star)}
+\end{align}
+
+where $\hat \alpha$ are the coefficients for the support vectors and 
+$\mathbf{K(X, x_\star)}$ is the kernel values between the support vectors and the
+observation $x_\star$. The kernel function used for *filter 3* is the Gaussian RBF 
+kernel which is:
+\begin{align}
+K(x, x_\star) = exp(-\sigma ||x-x_\star||^2)
+\end{align}
+where $\sigma = 0.05$ was used. 
+
+
+```{r}
+# Support vectors
+sv<-alphaindex(filter3)[[1]]
+# Coefficients for the support vectors
+co<-coef(filter3)[[1]]
+# negative intercept
+intercept <- - b(filter3)
+
+# Support vector observations with response variable removed
+x <- spam[sv, -58] # Remove y value. 
+
+# The 10 observations we need to predict
+x_stars <- spam[1:10, -58]
+
+# The Gaussian RBF kernel function
+rbfkernel <- rbfdot(sigma = 0.05)
+
+k<-c()
+for(i in 1:10){ # We produce predictions for just the first 10 points in the dataset.
+  k2<-NULL
+  for(j in 1:length(sv)){
+    k2[j] <- co[j]*rbfkernel(unlist(x[j,]), unlist(x_stars[i,]))
+  }
+  prediction <- intercept + sum(k2)
+  prediction
+  k[i]<- prediction
+}
+```
+
+
+
+```{r}
+manual_pred <- k
+function_pred <- predict(filter3,spam[1:10,-58], type = "decision")
+
+table_data <- data.frame(manual_pred, function_pred)
+colnames(table_data) <- c("Manual prediction", "Predict function")
+kable(table_data, caption = "Comparision between manual prediction and the predict function for the first 10 observations in the spam data set.")
+```
+
+Comparing the values from manual prediction and the predict function we get the same value
+for the prediction of the first 10 observations.
+
+
+
+
+# Assignment 3. Neural Networks
+
+
+## 3.1 
+
+Train a neural network to learn the trigonometric sine function. To do so, sample 500 points uniformly at random in the interval [0, 10]. Apply the sine function to each point. The resulting value pairs are the data points available to you. Use 25 of the 500 points for training and the rest for test. Use one hidden layer with 10 hidden units. You do not need to apply early stopping. Plot the training and test data, and the predictions of the learned NN on the test data. You should get good results. Comment your results.
+
+```{r}
+
+# The data
+set.seed(1234567890)
+data_runif <- runif(500, min = 0, max = 10)
+data_df <- data.frame(runif = data_runif, sin = sin(data_runif))
+
+tr_data <- data_df[1:25,]
+te_data <-  data_df[26:500,]
+
+# Random initialization of the weights in the interval [-1, 1], 20 weights + 11 bias = 31
+winit <- runif(31, min = -1, max = 1)
+
+ 
+
+
+```
+
+```{r}
+
+# Neural Network
+nn_model_assignment_1 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), startweights = winit)
+
+predictions <- predict(nn_model_assignment_1, newdata = te_data) %>% as.vector()
+
+```
+
+```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions"}
+
+plot(tr_data, cex = 2, xlab = "runif[0,10]", ylab = "Sin(x)")
+points(te_data, col = "blue", cex = 1)
+points(te_data[,1], predictions, col = "red", cex = 1)
+legend("bottomright", legend = c("Train", "Test", "Prediction"),
+col = c("black", "blue", "red"), pch = 16)
+
+
+```
+
+The neural network have successfully learned the sin(x) pattern as the test plot and prediction plot follows each other very well.
+
+
+
+\clearpage
+
+## 3.2
+
+In question (1), you used the default logistic (a.k.a. sigmoid) activation function, i.e. act.fct = "logistic". Repeat question (1) with the following custom activation functions: $h_1(x) = x, h_2(x) = max{0, x}$ and $h_3(x) = \text{ln}(1 + exp x)$ (a.k.a. linear, ReLU and softplus). See the help file of the neuralnet package to learn how to use custom activation functions. Plot and comment your results.
+
+
+```{r}
+
+# Three custom activation function
+h1 <- function(x) x
+h2 <- function(x) ifelse(x > 0, x, 0) # same as max(0,x)
+h3 <- function(x) log(1 + exp(x))
+
+
+# Neural Network
+nn_model_h1 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h1, startweights = winit)
+nn_model_h2 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h2, startweights = winit)
+nn_model_h3 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h3, startweights = winit)
+
+predictions_h1 <- predict(nn_model_h1, newdata = te_data) %>% as.vector()
+predictions_h2 <- predict(nn_model_h2, newdata = te_data) %>% as.vector()
+predictions_h3 <- predict(nn_model_h3, newdata = te_data) %>% as.vector()
+
+
+
+```
+
+
+```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions for first activation function (linear)"}
+
+plot(tr_data, cex = 2, xlab = "runif[0,10]", ylab = "Sin(x)")
+points(te_data, col = "blue", cex=1)
+points(te_data[,1], predictions_h1, col = "red", cex = 1)
+legend("bottomright", legend = c("Train", "Test", "Prediction"),
+col = c("black", "blue", "red"), pch = 16)
+
+
+```
+
+In figure 2, we can see that the prediction is just a straight line and does not not fit the test data well. This is because the linear activation function can only represent linear mappings between input and output. Therefore, the prediction does not fit the test data well because the data is non-linear.
+
+```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions for second activation function (ReLu)"}
+
+plot(tr_data, cex = 2, xlab = "runif[0,10]", ylab = "Sin(x)")
+points(te_data, col = "blue", cex = 1)
+points(te_data[,1], predictions_h2, col = "red", cex = 1)
+legend("bottomright", legend = c("Train", "Test", "Prediction"),
+col = c("black", "blue", "red"), pch = 16)
+
+
+
+```
+
+In figure 3, when we use ReLu as a activation function we get better result than the linear activation function, but still this is very bad fit to the test data.
+
+```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions for third activation function"}
+
+plot(tr_data, cex = 2, xlab = "runif[0,10]", ylab = "Sin(x)")
+points(te_data, col = "blue", cex=1)
+points(te_data[,1], predictions_h3, col = "red", cex = 1)
+legend("bottomright", legend = c("Train", "Test", "Prediction"),
+col = c("black", "blue", "red"), pch = 16)
+
+
+
+```
+
+In figure 4, we use activation function softmax $\text{ln}(1 + exp x)$ and the prediction seems to follow the the test data well. This activation function has the best prediction between the three activation function we have used.
+
+
+
+
+## 3.3
+
+Sample 500 points uniformly at random in the interval [0, 50], and apply the sine function to each point. Use the NN learned in question (1) to predict the sine function value for these new 500 points. You should get mixed results. Plot and comment your results.
+
+
+```{r}
+
+# The data
+set.seed(1234567890)
+data_runif <- runif(500, min = 0, max = 50)
+data_df <- data.frame(runif = data_runif, sin =  sin(data_runif))
+
+
+
+
+
+predictions <- predict(nn_model_assignment_1, newdata = data_df) %>% as.vector()
+
+```
+
+
+```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions with runif[0,50]"}
+
+
+plot(tr_data, cex = 2, xlab = "runif[0,50]", ylab = "Sin(x)", ylim = c(-11, 2), xlim = c(0,50))
+points(data_df, col = "blue", cex=1)
+points(data_df[,1], predictions, col = "red", cex=1)
+legend("bottomleft", legend = c("Train", "Test", "Prediction"),
+col = c("black", "blue", "red"), pch = 16)
+
+```
+
+In figure 5, the predictions follows the test data well between values from 0 to 10.
+This makes sense, because the NN learned in question (1) trained values between 0 to 10.
+
+## 3.4
+
+In question (3), the predictions seem to converge to some value. Explain why this happens. To answer this question, you may need to get access to the weights of the NN learned. You can do it by running *nn* or *nn*$*weights* where *nn* is the NN learned.
+
+**Answer:**
+To understand why the predictions seem to converge to some value we need to look at the formula for the full NN model (Lindholm et al., 2022).
+
+$$\mathbf{q} = h(\mathbf{W}^{(1)}\mathbf{x}+ \mathbf{b}^{1})$$
+$$\hat{y} =\mathbf{W}^{(2)}\mathbf{q}+ \mathbf{b}^{2} $$
+
+* $h$ is the  activation function $h(z) = \frac{1}{1+e^{-z}}$
+
+* $\mathbf{W}$ is the weight matrix.
+
+* $\mathbf{x}$ is the input.
+
+* $\mathbf{b}$ is the bias.
+
+* $\hat{y}$ is the prediction.
+
+In the table below we print out the weights and bias from the NN.
+
+```{r}
+
+W1 <- nn_model_assignment_1$weights[[1]][[1]][2,]
+b1 <- nn_model_assignment_1$weights[[1]][[1]][1,]
+
+W2 <- nn_model_assignment_1$weights[[1]][[2]][2:11,]
+b2 <- nn_model_assignment_1$weights[[1]][[2]][1,]
+
+mat <- matrix("", 10, 4)
+colnames(mat) <- c("W1", "W2", "b1", "b2")
+
+mat[1:10,1] <- round(W1,2)
+mat[1:10,2] <- round(W2,2)
+mat[1:10,3] <- round(b1,2)
+mat[1,4] <-round(b2,2)
+
+kable(mat, caption = "The weights and the bias")
+
+```
+
+
+Now we calculate $\mathbf{q}$ by using $\mathbf{W}^{(1)}$, $\mathbf{x}$ (some high number, we use 50) and $\mathbf{b}^{1}$.
+
+
+```{r}
+
+# Activation function
+logistic <- function(x){
+  out <- 1 / (1 + exp(-x))
+ return(out)
+}
+
+# Input (some high value)
+x <- 50 
+q <- logistic(W1 * x + b1)
+
+kable(q, digits = 0, col.names = "q")
+
+# W2 %*% q + b2
+```
+
+We know that the logistic function are going to return 1 if the input is large and 0 if the input is small and that is why the $\mathbf{q}$ are going to have the same output if we have a large value for $x$. This is because all positive weights from $\mathbf{W}^{(1)}$ become large, and negative weights become small as $x$ increases.
+
+Now we can calculate $\hat{y}$, and because there are seven 0:s and three 1:s on index 1,3,5 , we can write:
+
+$$\hat{y}=W_1^{2} + W_3^{2} + W_5^{2} + \mathbf{b}^{2} = 0.77 + (-16.05) + 4.31 + (-0.11) = -10.75$$
+
+This tells us that the NN should converge to value -10.75 when input get large which we can see in figure 5.
+
+
+## 3.5
+
+Sample 500 points uniformly at random in the interval [0, 10], and apply the sine func-tion to each point. Use all these points as training points for learning a NN that tries to predict $x$ from $sin(x)$, i.e. unlike before when the goal was to predict $sin(x)$ from $x$. Use the learned NN to predict the training data. You should get bad results. Plot and comment your results. Help: Some people get a convergence error in this question. It can be solved by stopping the training before reaching convergence by setting threshold = 0.1.
+
+
+
+```{r}
+
+
+set.seed(1234567890)
+data_runif <- runif(500, min = 0, max = 10)
+data_df <- data.frame(runif = data_runif, sin = sin(data_runif))
+
+tr_data <- data_df[1:25,]
+te_data <-  data_df[26:500,]
+
+# Random initialization of the weights in the interval [-1, 1], 20 weights + 11 bias
+winit <- runif(31, min = -1, max = 1)
+
+
+```
+
+
+
+```{r}
+
+# Neural Network
+nn_model <- neuralnet(runif ~ sin, data = tr_data, hidden = c(10), startweights = winit,
+                      threshold = 0.1)
+
+predictions <- predict(nn_model, newdata = te_data) %>% as.vector()
+
+```
+
+```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions, x ~ sin(x)"}
+
+plot(tr_data, cex = 2, ylab = "runif[0,10]", xlab = "Sin(x)", ylim = c(-2, 11))
+points(te_data, col = "blue", cex = 1)
+points(predictions, te_data[,1], col = "red", cex = 1)
+legend("topleft", legend = c("Train", "Test", "Prediction"),
+col = c("black", "blue", "red"), pch = 16)
+
+
+
+```
+
+In figure 6, we can see that the predicted values does not fit the a test data at all.
+This is because the $sin(x)$ function can return same value for different $x$ values and therefore the NN gets confused.
+
+
+
+
+
+
+
+
