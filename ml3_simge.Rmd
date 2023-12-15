@@ -13,6 +13,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(geosphere)
+library(knitr)
 ```
 
 # Question 1: KERNEL METHODS
@@ -22,14 +23,16 @@ You are asked to provide a temperature forecast for a date and place in Sweden. 
 \begin{itemize}
   \item The first to account for the physical distance from a station to the point of interest. For this purpose, use the function distHaversine from the R package geosphere.
   \item The second to account for the distance between the day a temperature measurement was made and the day of interest.
-  \item The third to account for the distance between the hour of the day a temperature mea- surement was made and the hour of interest.
+  \item The third to account for the distance between the hour of the day a temperature measurement was made and the hour of interest.
 \end{itemize}
 
 Choose an appropriate smoothing coefficient or width for each of the three kernels above. No cross-validation should be used. Instead, choose manually a width that gives large kernel values to closer points and small values to distant points. Show this with a plot of the kernel value as a function of distance. Help: Note that the file temps50k.csv may contain temper- ature measurements that are posterior to the day and hour of your forecast. You must filter such measurements out, i.e. they cannot be used to compute the forecast. \
 
 Finally, repeat the exercise above by combining the three kernels into one by multiplying them, instead of summing them up. Compare the results obtained in both cases and elaborate on why they may differ.
 
-**Answer:** The code is as folllows:
+**Answer:** First we created a new column datetime to merge the date and time, then we eliminated the posterior values from the target datetime. Since temperature in a year is seasonal, we calculated only day differences and ignore the year by ignoring global warming since it has a minor effect. Moreover, we convert hour to 12 values. For example we assumed that 23.00 and 01.00 has 2 hour difference, not 22. \
+
+The code is as follows:
 ```{r, warning=FALSE}
 set.seed(1234567890)
 stations <- read.csv("stations.csv", fileEncoding = "latin1")
@@ -42,122 +45,321 @@ st$datetime <- as.POSIXct(paste(as.character(st$date), as.character(st$time)),
 
 # choose manually a width that gives large kernel values to closer points 
 # and small values to distant points
-h_distance <- 1000
-h_date <- 50
-h_time <- 3
-
-# Point to predict
-a <- 	56.8526
-b <- 13.8822
-date <- "2007-06-30"
+h_distance <- 50
+h_date <- 1
+h_time <- 0.4
 
 # Predict for each of these times
 times <- c("04:00:00", "06:00:00", "08:00:00", "10:00:00", "12:00:00", 
            "14:00:00", "16:00:00", "18:00:00", "20:00:00", "22:00:00", 
            "24:00:00") 
-```
 
-```{r}
 gaussian_kernel <- function(diff_vector, l){ 
   kernel <- exp(-(diff_vector / (2*(l^2))))
   return(kernel)
 }
 ```
 
-```{r, fig.align='center'}
-# Bandwith plot
-target_datetime <- as.POSIXct(paste(date, times[5]), format = "%Y-%m-%d %H:%M:%S", tz = "GMT")
+```{r}
+# Point to predict
+a <- 	55.3836	#latitude
+b <- 12.8203	 #longitude
+date <- "1995-11-03"
+
+i <- 1
+target_datetime <- as.POSIXct(paste(date, times[i]), format = "%Y-%m-%d %H:%M:%S", tz = "GMT")
 datetime_diff <- target_datetime - st$datetime
-st_new <- st[which(datetime_diff >= 0), ]
+st_new <- st[which(datetime_diff > 0), ] # eliminate the posterior 
 
+# distance calculation
+distance_new <- distHaversine(cbind(st_new$latitude, st_new$longitude), c(a, b))
 
-distance_new <- distHaversine(cbind(st_new$longitude, st_new$latitude), c(a, b))
-date_new <- floor(as.numeric(target_datetime - st_new$datetime) / 24)
-time_new <- as.numeric(target_datetime - st_new$datetime) %% 24 # we don't have minutes
+# date calculation
+date1 <- as.Date(date, format = "%Y-%m-%d")
+date2 <- as.Date(st_new$date, format = "%Y-%m-%d")
 
+day_of_year1 <- as.numeric(format(date1, "%j"))
+day_of_year2 <- as.numeric(format(date2, "%j"))
+
+date_new <- abs(day_of_year2 - day_of_year1)
+
+# hour calculation
+st_new$hour <- as.numeric(format(as.POSIXct(st_new$datetime), "%I"))
+target_hour <- as.numeric(substr(times[i], 1, 2))
+time_new_init <- abs(st_new$hour - target_hour) 
+time_new <- ifelse(time_new_init < 12, time_new_init, 24-time_new_init) # convert to 12 
+
+# kernel calculation
 distance_kernel <- gaussian_kernel(distance_new, h_distance)
 date_kernel <- gaussian_kernel(date_new, h_date)
 time_kernel <- gaussian_kernel(time_new, h_time)
+
+kernel_diff <- c(gaussian_kernel(max(distance_new), h_distance),
+                 gaussian_kernel(min(distance_new), h_distance),
+                 gaussian_kernel(max(date_new), h_date),
+                 gaussian_kernel(min(date_new), h_date),
+                 gaussian_kernel(max(distance_new), h_time), 
+                 gaussian_kernel(min(distance_new), h_time))
+diff_name <- c("max distance", "min distance",
+          "max date", "min date",
+          "max time", "min time")
+
+kernel_df <- data.frame("Difference" = kernel_diff)
+rownames(kernel_df) <- diff_name
+kable(kernel_df, caption = "Kernel Differences")
 ```
 
-The bandwith plots can be seen below. As the distance increases, kernel value decreases. Bandwith values for distance, date and time is selected as 1000, 50, 3 respectively. 
-```{r, fig.align='center'}
-plot(distance_new, distance_kernel)
+```{r, echo=FALSE, fig.align='center', fig.width=10}
+par(mfrow = c(1, 2))
+plot(distance_new, distance_kernel, main = "Distance-Kernel Graph",
+     xlab = "Distance Difference", ylab = "Kernel")
+grid()
+
+plot(date_new, date_kernel, main = "Date-Kernel Graph",
+     xlab = "Date Difference", ylab = "Kernel")
+grid()
 ```
 
-```{r, fig.align='center'}
-plot(date_new, date_kernel)
+```{r, echo=FALSE, fig.align='center', fig.width=4, fig.height=3}
+plot(time_new, time_kernel, main = "Time-Kernel Graph",
+     xlab = "Time Difference", ylab = "Kernel")
+grid()
 ```
+The bandwith values are selected 50, 1 and 0.4 for distance, date and time respectively. From the graphs and table above it can be observed that kernel is low when distance is high and vice versa. Also kernel values vary between 0 and 1 which is important because otherwise predictions will be around average temperature value. \
 
-```{r, fig.align='center'}
-plot(time_new, time_kernel)
-```
-
-Prediction plot with summation of kernels can be seen below.
-```{r, fig.align='center'}
-# SUMMATION OF KERNELS
-temp <- vector(length=length(times))
-
-for (i in 1:length(times)){
-  target_datetime <- as.POSIXct(paste(date, times[i]), format = "%Y-%m-%d %H:%M:%S", tz = "GMT")
-  datetime_diff <- target_datetime - st$datetime
-  
-  st_new <- st[which(datetime_diff >= 0), ] # exclude posterior rows
-  
-  distance_new <- distHaversine(cbind(st_new$longitude, st_new$latitude), c(a, b))
-  date_new <- floor(as.numeric(target_datetime - st_new$datetime) / 24)
-  time_new <- as.numeric(target_datetime - st_new$datetime) %% 24 # we don't have minutes
-  
-  weight_distance <- gaussian_kernel(distance_new, h_distance)
-  weight_date <- gaussian_kernel(date_new, h_date)
-  weight_time <- gaussian_kernel(time_new, h_time)
-  
-  w <- weight_distance + weight_date + weight_time
-  total_weight <- sum(w)
-  weighted_sum <- sum(w * st_new$air_temperature) 
-  
-  temp[i] <- weighted_sum/total_weight
+The functions to predict temperature is as follows for summation and multiplication:
+```{r}
+summation_kernel_fnc <- function(target_date, a, b){
+  temp <- numeric(length=length(times))
+  for (i in 1:length(times)){
+    target_datetime <- as.POSIXct(paste(target_date, times[i]), 
+                                  format = "%Y-%m-%d %H:%M:%S", tz = "GMT")
+    datetime_diff <- target_datetime - st$datetime
+    st_new <- st[which(datetime_diff > 0), ] # eliminate the posterior 
+    
+    # distance calculation
+    distance_new <- distHaversine(cbind(st_new$latitude, st_new$longitude), c(a, b))
+    
+    # date calculation
+    date1 <- as.Date(target_date, format = "%Y-%m-%d")
+    date2 <- as.Date(st_new$date, format = "%Y-%m-%d")
+    
+    day_of_year1 <- as.numeric(format(date1, "%j"))
+    day_of_year2 <- as.numeric(format(date2, "%j"))
+    
+    date_new <- abs(day_of_year2 - day_of_year1)
+    
+    # hour calculation
+    st_new$hour <- as.numeric(format(as.POSIXct(st_new$datetime), "%I"))
+    target_hour <- as.numeric(substr(times[i], 1, 2))
+    time_new_init <- abs(st_new$hour - target_hour) 
+    time_new <- ifelse(time_new_init < 12, time_new_init, 24-time_new_init) # convert to 12
+    
+    weight_distance <- gaussian_kernel(distance_new, h_distance)
+    weight_date <- gaussian_kernel(date_new, h_date)
+    weight_time <- gaussian_kernel(time_new, h_time)
+    
+    w <- weight_distance + weight_date + weight_time
+    total_weight <- sum(w)
+    weighted_sum <- sum(w * st_new$air_temperature) 
+    
+    temp[i] <- weighted_sum/total_weight
+  }
+  return(temp)
 }
+```
 
-plot(temp, type="o", xaxt="n", ylab = "Temperature", xlab = " ")
+```{r}
+multiplication_kernel_fnc <- function(target_date, a, b){
+  temp <- numeric(length=length(times))
+  for (i in 1:length(times)){
+    target_datetime <- as.POSIXct(paste(target_date, times[i]), 
+                                  format = "%Y-%m-%d %H:%M:%S", tz = "GMT")
+    datetime_diff <- target_datetime - st$datetime
+    st_new <- st[which(datetime_diff > 0), ] # eliminate the posterior 
+    
+    # distance calculation
+    distance_new <- distHaversine(cbind(st_new$latitude, st_new$longitude), c(a, b))
+    
+    # date calculation
+    date1 <- as.Date(target_date, format = "%Y-%m-%d")
+    date2 <- as.Date(st_new$date, format = "%Y-%m-%d")
+    
+    day_of_year1 <- as.numeric(format(date1, "%j"))
+    day_of_year2 <- as.numeric(format(date2, "%j"))
+    
+    date_new <- abs(day_of_year2 - day_of_year1)
+    
+    # hour calculation
+    st_new$hour <- as.numeric(format(as.POSIXct(st_new$datetime), "%I"))
+    target_hour <- as.numeric(substr(times[i], 1, 2))
+    time_new_init <- abs(st_new$hour - target_hour) 
+    time_new <- ifelse(time_new_init < 12, time_new_init, 24-time_new_init) # convert to 12
+    
+    weight_distance <- gaussian_kernel(distance_new, h_distance)
+    weight_date <- gaussian_kernel(date_new, h_date)
+    weight_time <- gaussian_kernel(time_new, h_time)
+    
+    w <- weight_distance * weight_date * weight_time
+    total_weight <- sum(w)
+    weighted_sum <- sum(w * st_new$air_temperature) 
+    
+    temp[i] <- weighted_sum/total_weight
+  }
+  return(temp)
+}
+```
+
+**Prediction 1:**
+```{r, fig.align='center', echo=FALSE, fig.width=10}
+predict_data <- st[which(st$air_temperature==min(st$air_temperature)),]
+target_date <- predict_data$date
+a <- predict_data$latitude
+b <- predict_data$longitude
+actual_temp <- predict_data$air_temperature
+df_forecast <- data.frame("Time" = times, 
+                          "sum_kernel_forecast" = summation_kernel_fnc(target_date, a, b),
+                          "prod_kernel_forecast" = multiplication_kernel_fnc(target_date, a, b))
+
+cat("Actual temperature is:", actual_temp, "at", predict_data$time, 
+    "in location (", predict_data$latitude, ",", predict_data$longitude, ")\n")
+kable(df_forecast, caption = "Forecast Low Temperature")
+par(mfrow = c(1, 2))
+plot(df_forecast$sum_kernel_forecast, type="o", xaxt="n", ylab = "Temperature", 
+     xlab = " ", main = "Sum kernel")
+axis(side = 1, at = 1:length(times), labels = times, las = 2) 
+grid()
+
+plot(df_forecast$prod_kernel_forecast, type="o", xaxt="n", ylab = "Temperature", 
+     xlab = " ", main = "Production kernel")
+axis(side = 1, at = 1:length(times), labels = times, las = 2) 
+grid()
+```
+**Prediction 2:**
+```{r, fig.align='center', echo=FALSE, fig.width=10}
+predict_data <- st[11769,]
+target_date <- predict_data$date
+a <- predict_data$latitude
+b <- predict_data$longitude
+actual_temp <- predict_data$air_temperature
+df_forecast <- data.frame("Time" = times, 
+                          "sum_kernel_forecast" = summation_kernel_fnc(target_date, a, b),
+                          "prod_kernel_forecast" = multiplication_kernel_fnc(target_date, a, b))
+
+cat("Actual temperature is:", actual_temp, "at", predict_data$time, 
+    "in location (", predict_data$latitude, ",", predict_data$longitude, ")\n")
+kable(df_forecast, caption = "Forecast 1")
+par(mfrow = c(1, 2))
+plot(df_forecast$sum_kernel_forecast, type="o", xaxt="n", ylab = "Temperature", 
+     xlab = " ", main = "Sum kernel")
+axis(side = 1, at = 1:length(times), labels = times, las = 2) 
+grid()
+
+plot(df_forecast$prod_kernel_forecast, type="o", xaxt="n", ylab = "Temperature", 
+     xlab = " ", main = "Production kernel")
+axis(side = 1, at = 1:length(times), labels = times, las = 2) 
+grid()
+```
+**Prediction 3:**
+```{r, fig.align='center', echo=FALSE, fig.width=10}
+predict_data <- st[26872,]
+target_date <- predict_data$date
+a <- predict_data$latitude
+b <- predict_data$longitude
+actual_temp <- predict_data$air_temperature
+df_forecast <- data.frame("Time" = times, 
+                          "sum_kernel_forecast" = summation_kernel_fnc(target_date, a, b),
+                          "prod_kernel_forecast" = multiplication_kernel_fnc(target_date, a, b))
+
+cat("Actual temperature is:", actual_temp, "at", predict_data$time, 
+    "in location (", predict_data$latitude, ",", predict_data$longitude, ")\n")
+kable(df_forecast, caption = "Forecast")
+
+par(mfrow = c(1, 2))
+plot(df_forecast$sum_kernel_forecast, type="o", xaxt="n", ylab = "Temperature", 
+     xlab = " ", main = "Sum kernel")
+axis(side = 1, at = 1:length(times), labels = times, las = 2) 
+grid()
+
+plot(df_forecast$prod_kernel_forecast, type="o", xaxt="n", ylab = "Temperature", 
+     xlab = " ", main = "Production kernel")
+axis(side = 1, at = 1:length(times), labels = times, las = 2) 
+grid()
+```
+**Prediction 4:**
+```{r, fig.align='center', echo=FALSE, fig.width=10}
+predict_data <- st[which(st$air_temperature==max(st$air_temperature)),]
+target_date <- predict_data$date
+a <- predict_data$latitude
+b <- predict_data$longitude
+actual_temp <- predict_data$air_temperature
+df_forecast <- data.frame("Time" = times, 
+                          "sum_kernel_forecast" = summation_kernel_fnc(target_date, a, b),
+                          "prod_kernel_forecast" = multiplication_kernel_fnc(target_date, a, b))
+
+cat("Actual temperature is:", actual_temp, "at", predict_data$time, 
+    "in location (", predict_data$latitude, ",", predict_data$longitude, ")\n")
+kable(df_forecast, caption = "Forecast High Temperature")
+
+par(mfrow = c(1, 2))
+plot(df_forecast$sum_kernel_forecast, type="o", xaxt="n", ylab = "Temperature", 
+     xlab = " ", main = "Sum kernel")
+axis(side = 1, at = 1:length(times), labels = times, las = 2) 
+grid()
+
+plot(df_forecast$prod_kernel_forecast, type="o", xaxt="n", ylab = "Temperature", 
+     xlab = " ", main = "Production kernel")
+axis(side = 1, at = 1:length(times), labels = times, las = 2) 
+grid()
+```
+**Prediction Winter:** Let's forecast the date "2000-02-06" in the coordinates (57.7213, 16.4683)
+```{r, fig.align='center', echo=FALSE, fig.width=10}
+target_date <- "2000-02-06"
+a <- 57.7213
+b <- 16.4683
+actual_temp <- predict_data$air_temperature
+df_forecast <- data.frame("Time" = times, 
+                          "sum_kernel_forecast" = summation_kernel_fnc(target_date, a, b),
+                          "prod_kernel_forecast" = multiplication_kernel_fnc(target_date, a, b))
+
+kable(df_forecast, caption = "Forecast Winter")
+
+par(mfrow = c(1, 2))
+plot(df_forecast$sum_kernel_forecast, type="o", xaxt="n", ylab = "Temperature", 
+     xlab = " ", main = "Sum kernel")
+axis(side = 1, at = 1:length(times), labels = times, las = 2) 
+grid()
+
+plot(df_forecast$prod_kernel_forecast, type="o", xaxt="n", ylab = "Temperature", 
+     xlab = " ", main = "Production kernel")
 axis(side = 1, at = 1:length(times), labels = times, las = 2) 
 grid()
 ```
 
-Prediction plot with multiplication of kernels can be seen below.
-```{r, fig.align='center'}
-# MULTIPLIATION OF KERNELS
-temp <- vector(length=length(times))
+**Prediction Summer:**  Now, let's forecast the date "2000-07-06" in the coordinates (57.7213, 16.4683)
+```{r, fig.align='center', echo=FALSE, fig.width=10}
+target_date <- "2000-07-06"
+a <- 57.7213
+b <- 16.4683
+actual_temp <- predict_data$air_temperature
+df_forecast <- data.frame("Time" = times, 
+                          "sum_kernel_forecast" = summation_kernel_fnc(target_date, a, b),
+                          "prod_kernel_forecast" = multiplication_kernel_fnc(target_date, a, b))
 
-for (i in 1:length(times)){
-  target_datetime <- as.POSIXct(paste(date, times[i]), format = "%Y-%m-%d %H:%M:%S", tz = "GMT")
-  datetime_diff <- target_datetime - st$datetime
-  
-  st_new <- st[which(datetime_diff >= 0), ]
-  
-  distance_new <- distHaversine(cbind(st_new$longitude, st_new$latitude), c(a, b))
-  date_new <- floor(as.numeric(target_datetime - st_new$datetime) / 24)
-  time_new <- as.numeric(target_datetime - st_new$datetime) %% 24 # we don't have minutes
-  
-  weight_distance <- gaussian_kernel(distance_new, h_distance)
-  weight_date <- gaussian_kernel(date_new, h_date)
-  weight_time <- gaussian_kernel(time_new, h_time)
-  
-  w <- weight_distance * weight_date * weight_time
-  total_weight <- sum(w)
-  weighted_sum <- sum(w * st_new$air_temperature) 
-  
-  temp[i] <- weighted_sum/total_weight
-}
+kable(df_forecast, caption = "Forecast Summer")
 
-plot(temp, type="o", xaxt="n", ylab = "Temperature", xlab = " ")
+par(mfrow = c(1, 2))
+plot(df_forecast$sum_kernel_forecast, type="o", xaxt="n", ylab = "Temperature", 
+     xlab = " ", main = "Sum kernel")
+axis(side = 1, at = 1:length(times), labels = times, las = 2) 
+grid()
+
+plot(df_forecast$prod_kernel_forecast, type="o", xaxt="n", ylab = "Temperature", 
+     xlab = " ", main = "Production kernel")
 axis(side = 1, at = 1:length(times), labels = times, las = 2) 
 grid()
 ```
-
-Multiplying kernels works better than summing kernels. In the multiplication, if the weights are high it means that it puts more emphasis on that row and if weights are less, it puts less emphasis on that row.
-
-
-
+### Conclusion
+We cannot say for sure which kernel -summation or multiplication- is better since we don't have a test data but we can make a conclusion using our intuition. It can be observed that temperature predictions is lower in nights and early mornings. Also temperature is lower in winter and higher in summer. By looking at the prediction 1 and 4, it can be concluded that multiplication kernel is better at predicting extreme values since its more sensitive. Multiplication operation emphasizes differences between extreme values more.
 
 
