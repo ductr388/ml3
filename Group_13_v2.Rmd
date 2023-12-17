@@ -6,9 +6,10 @@ author:
 - William Wiik
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output:
-    bookdown::pdf_document2: default
-    fig_caption: yes
-    number_sections: yes
+  pdf_document: default
+  fig_caption: yes
+  number_sections: yes
+  bookdown::pdf_document2: default
 geometry: top=100pt,bottom=100pt,left=68pt,right=66pt
 subtitle: 732A99
 header-includes:
@@ -21,8 +22,7 @@ header-includes:
 - \usepackage[swedish, english]{babel}
 - \renewcommand{\headrulewidth}{0pt}
 - \renewcommand{\and}{\\}
-- \pretitle{\centering\vspace{0cm}{\large Laboration report in Machine Learning
-  \par}\vspace{4cm}\Huge\textbf}
+- \pretitle{\centering\vspace{0cm}{\large Laboration report in Machine Learning \par}\vspace{4cm}\Huge\textbf}
 - \posttitle{\vspace{1cm}\large\textbf{}\par}
 - \preauthor{\centering\vspace{4cm}\normalsize}
 - \postauthor{\par\vspace{3cm}}
@@ -73,10 +73,10 @@ library(neuralnet)
 library(cowplot)
 library(geosphere)
 #library(kableExtra)
-# knitr::opts_chunk$set(
-#   echo = TRUE, 
-#   fig.width = 4.5, 
-#   fig.height = 3)
+knitr::opts_chunk$set(
+  echo = TRUE,
+  fig.width = 5,
+  fig.height = 4)
 ```
 
 
@@ -677,15 +677,14 @@ col = c("black", "blue", "red"), pch = 16)
 
 ```
 
-The neural network have successfully learned the sin(x) pattern as the test plot and prediction plot follows each other very well.
-
+In figure 1, the neural network have successfully learned the sin(x) pattern.
 
 
 \clearpage
 
 ## 3.2
 
-In question (1), you used the default logistic (a.k.a. sigmoid) activation function, i.e. act.fct = "logistic". Repeat question (1) with the following custom activation functions: $h_1(x) = x, h_2(x) = max{0, x}$ and $h_3(x) = \text{ln}(1 + exp x)$ (a.k.a. linear, ReLU and softplus). See the help file of the neuralnet package to learn how to use custom activation functions. Plot and comment your results.
+In question (1), you used the default logistic (a.k.a. sigmoid) activation function, i.e. act.fct = "logistic". Repeat question (1) with the following custom activation functions: $h_1(x) = x, h_2(x) = max\{0, x\}$ and $h_3(x) = \text{ln}(1 + e^{x})$ (a.k.a. linear, ReLU and softplus). See the help file of the neuralnet package to learn how to use custom activation functions. Plot and comment your results.
 
 
 ```{r}
@@ -697,9 +696,12 @@ h3 <- function(x) log(1 + exp(x))
 
 
 # Neural Network
-nn_model_h1 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h1, startweights = winit)
-nn_model_h2 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h2, startweights = winit)
-nn_model_h3 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10), act.fct = h3, startweights = winit)
+nn_model_h1 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10),
+                         act.fct = h1, startweights = winit)
+nn_model_h2 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10),
+                         act.fct = h2, startweights = winit)
+nn_model_h3 <- neuralnet(sin ~ runif, data = tr_data, hidden = c(10),
+                         act.fct = h3, startweights = winit)
 
 predictions_h1 <- predict(nn_model_h1, newdata = te_data) %>% as.vector()
 predictions_h2 <- predict(nn_model_h2, newdata = te_data) %>% as.vector()
@@ -709,6 +711,7 @@ predictions_h3 <- predict(nn_model_h3, newdata = te_data) %>% as.vector()
 
 ```
 
+\clearpage
 
 ```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions for first activation function (linear)"}
 
@@ -722,6 +725,9 @@ col = c("black", "blue", "red"), pch = 16)
 ```
 
 In figure 2, we can see that the prediction is just a straight line and does not not fit the test data well. This is because the linear activation function can only represent linear mappings between input and output. Therefore, the prediction does not fit the test data well because the data is non-linear.
+
+\clearpage
+
 
 ```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions for second activation function (ReLu)"}
 
@@ -737,6 +743,8 @@ col = c("black", "blue", "red"), pch = 16)
 
 In figure 3, when we use ReLu as a activation function we get better result than the linear activation function, but still this is very bad fit to the test data.
 
+\clearpage
+
 ```{r, fig.show="hold", fig.cap = "\\label{} Training data, test data and predictions for third activation function"}
 
 plot(tr_data, cex = 2, xlab = "runif[0,10]", ylab = "Sin(x)")
@@ -749,9 +757,9 @@ col = c("black", "blue", "red"), pch = 16)
 
 ```
 
-In figure 4, we use activation function softmax $\text{ln}(1 + exp x)$ and the prediction seems to follow the the test data well. This activation function has the best prediction between the three activation function we have used.
+In figure 4, we use activation function softmax $\text{ln}(1 + e^{x})$ and the prediction seems to follow the the test data well. This activation function has the best prediction between the three activation function we have used.
 
-
+\clearpage
 
 
 ## 3.3
@@ -789,7 +797,10 @@ col = c("black", "blue", "red"), pch = 16)
 In figure 5, the predictions follows the test data well between values from 0 to 10.
 This makes sense, because the NN learned in question (1) trained values between 0 to 10.
 
+
+\clearpage
 ## 3.4
+
 
 In question (3), the predictions seem to converge to some value. Explain why this happens. To answer this question, you may need to get access to the weights of the NN learned. You can do it by running *nn* or *nn*$*weights* where *nn* is the NN learned.
 
